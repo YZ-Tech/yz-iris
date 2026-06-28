@@ -1,0 +1,99 @@
+{
+  "id": "iris",
+  "name": "Iris",
+  "version": "0.0.1",
+  "enabled": false,
+  "nav": {
+    "label": "Iris",
+    "icon": "visibility",
+    "to": "/iris"
+  },
+  "dashboards": [],
+  "exports": [
+    { "id": "IrisPage", "type": "component" }
+  ],
+  "settings": {
+    "camera_index": {
+      "type": "int",
+      "default": 0,
+      "label": "Camera index",
+      "description": "OpenCV camera index to use (0 = first camera). Set via the Iris page camera picker."
+    },
+    "camera_label": {
+      "type": "string",
+      "default": "",
+      "label": "Camera display label",
+      "description": "Human-readable label from the browser device picker. Display only."
+    },
+    "respeaker_enabled": {
+      "type": "bool",
+      "default": false,
+      "label": "ReSpeaker DOA (Phase 3)",
+      "description": "Enable Direction of Arrival from the ReSpeaker USB array."
+    }
+  },
+  "service": {
+    "url": "http://127.0.0.1:9007",
+    "settingPath": "iris.satellite_url"
+  },
+  "contributes": {
+    "hooks": {
+      "onPromptBuild": {
+        "endpoint": "/prompt_context",
+        "ttlSeconds": 5
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "look",
+      "endpoint": "/tools/look",
+      "section": "iris",
+      "speakable": false,
+      "kind": "query",
+      "description": "Return a text description of the current scene — who is present, their position and gaze direction. Semantic only (no image). Use get_presence for a faster one-liner, or snapshot to capture actual JPEG frames.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "focus": {
+            "type": "string",
+            "description": "Optional — what to pay attention to, e.g. 'the face', 'the desk'."
+          }
+        }
+      }
+    },
+    {
+      "name": "get_presence",
+      "endpoint": "/tools/get_presence",
+      "section": "iris",
+      "speakable": true,
+      "kind": "info",
+      "description": "Return the current presence state: whether someone is in frame, their position, and gaze direction. Faster than look() — reads the live CV state without capturing a new frame.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "snapshot",
+      "endpoint": "/tools/snapshot",
+      "section": "iris",
+      "speakable": false,
+      "kind": "query",
+      "description": "Capture 1-5 JPEG frames from the camera and save them to disk. Returns file paths that you (the Loom listener) can Read to actually SEE what the camera sees. Use when you need real visual information, not just presence/gaze metadata.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Number of frames to capture (1-5, default 1)."
+          },
+          "interval_ms": {
+            "type": "integer",
+            "description": "Milliseconds between frames when count > 1 (default 500)."
+          }
+        }
+      }
+    }
+  ]
+}

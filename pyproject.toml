@@ -1,0 +1,39 @@
+[project]
+name = "yz-iris"
+version = "0.0.1"
+description = "Visual awareness satellite for JarvYZ — webcam presence, gaze, and scene understanding"
+readme = "plan.md"
+requires-python = ">=3.10,<3.13"
+license = { text = "MIT" }
+authors = [{ name = "Yeon Vinzenz Varapragasam" }]
+keywords = ["camera", "vision", "mediapipe", "jarvis", "satellite"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+]
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.5.0",
+    "httpx>=0.27.0",
+    "opencv-python>=4.8.0",
+    "mediapipe>=0.10.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["yz_iris*"]
+
+[tool.setuptools.package-data]
+yz_iris = [
+    "static/*",
+    "static/**/*",
+]

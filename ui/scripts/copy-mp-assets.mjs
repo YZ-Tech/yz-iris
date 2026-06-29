@@ -12,11 +12,13 @@ const root = resolve(here, '..')  // satellites/yz-iris/ui/
 const mpPkg = resolve(root, 'node_modules', '@mediapipe', 'tasks-vision')
 const mpWasm = resolve(mpPkg, 'wasm')
 const mpModel = resolve(root, 'blaze_face_short_range.tflite')
+const mpObjModel = resolve(root, 'efficientdet_lite0.tflite')
 const dst = resolve(root, '..', 'yz_iris', 'static', 'modules', 'yz-iris-mp')
 
 mkdirSync(resolve(dst, 'wasm'), { recursive: true })
 copyFileSync(resolve(mpPkg, 'vision_bundle.mjs'), resolve(dst, 'vision_bundle.mjs'))
 copyFileSync(mpModel, resolve(dst, 'blaze_face_short_range.tflite'))
+copyFileSync(mpObjModel, resolve(dst, 'efficientdet_lite0.tflite'))
 for (const f of readdirSync(mpWasm)) {
   copyFileSync(resolve(mpWasm, f), resolve(dst, 'wasm', f))
 }

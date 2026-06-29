@@ -15,11 +15,12 @@ import { ThemeProvider, createTheme, type Theme } from '@mui/material/styles'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { WSContext, useStandaloneWs } from './lib/ws'
-import { createIrisApi, type IrisApi } from './lib/api'
+import { type IrisApi } from './lib/api'
 import { BrowserMPCard } from './components/BrowserMPCard'
 import { BrowserSourceCard } from './components/BrowserSourceCard'
 import { CameraSelector } from './components/CameraSelector'
 import { PresenceWidget } from './components/PresenceWidget'
+import { YoloeSetupCard } from './components/YoloeSetupCard'
 import type { Camera, IrisState } from './types'
 
 export interface IrisPageProps {
@@ -119,7 +120,7 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
               {anyRunning
                 ? <VisibilityIcon color="success" fontSize="small" />
                 : <VisibilityOffIcon color="disabled" fontSize="small" />}
-              <Typography variant="subtitle1" fontWeight={600} component="div">
+              <Typography variant="subtitle1" component="div" sx={{ fontWeight: 600 }}>
                 {anyRunning ? 'Iris is watching' : 'Iris is idle'}
               </Typography>
             </Stack>
@@ -167,7 +168,7 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
         <CardHeader
           title={
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <Typography variant="subtitle1" fontWeight={600} component="div">
+              <Typography variant="subtitle1" component="div" sx={{ fontWeight: 600 }}>
                 Python Camera
               </Typography>
               <Typography variant="caption" color="text.secondary">(optional fallback)</Typography>
@@ -201,6 +202,8 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
           />
         </CardContent>
       </Card>
+
+      <YoloeSetupCard api={api} />
     </Stack>
   )
 }

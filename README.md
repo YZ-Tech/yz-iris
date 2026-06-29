@@ -103,9 +103,12 @@ Only state _changes_ are emitted, so the WS stream is quiet when nothing moves.
 | `GET` | `/state` | merged semantic state from all sources |
 | `POST` | `/start` | start Python CV loop |
 | `POST` | `/stop` | stop Python CV loop |
-| `POST` | `/tools/look` | LLM tool: semantic scene description (text only) |
+| `POST` | `/tools/look` | LLM tool: scene description; with `focus` runs open-vocab object find (YOLOE) |
+| `POST` | `/tools/scan_room` | LLM tool: open-vocab inventory of everything visible (YOLOE) → text + objects + frame |
 | `POST` | `/tools/get_presence` | LLM tool: one-shot presence query |
 | `POST` | `/tools/snapshot` | LLM tool: capture 1-5 JPEG frames → save to disk → return paths |
+| `GET` | `/yoloe/status` | scene-engine availability (user-installed, AGPL) |
+| `POST` | `/yoloe/install` | pip-install the YOLOE engine into the satellite venv |
 | `GET` | `/snapshot` | latest JPEG frame binary (image/jpeg) |
 | `GET` | `/prompt_context` | Loom brief contribution — iris state + snapshot hint |
 | `GET` | `/sources` | list registered sources + status |
@@ -163,6 +166,11 @@ Privacy shield: when any source is active, the TopBar shows **Camera: watching**
 - **Phase 2 (done)** — Loom vision: `snapshot` tool saves JPEG frames to disk; Loom
   listener reads them directly (no VLM intermediary — Claude IS the VLM). Brief
   hook injects iris state + snapshot hint into every external-mode prompt.
+- **Scene understanding — Phase 2a (done)** — open-vocabulary objects via YOLOE:
+  `scan_room` (full inventory) and `look(focus=…)` (find a specific thing) return a
+  text summary, structured boxes, and a raw frame path. The engine is user-installed
+  (AGPL, not bundled) so the satellite stays MIT; it degrades gracefully when absent.
+  Phase 2b: continuous object-diff `scene_change` events.
 - **Phase 3** — ReSpeaker DOA cross-correlation: match mic direction-of-arrival
   to detected face position to identify the active speaker
 - **Phase 4** — yz-people tie-in: match detected faces against enrolled samples

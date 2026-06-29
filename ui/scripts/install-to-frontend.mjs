@@ -46,6 +46,7 @@ const mpPkg = resolve(root, 'node_modules', '@mediapipe', 'tasks-vision')
 const mpBundle = resolve(mpPkg, 'vision_bundle.mjs')
 const mpWasm = resolve(mpPkg, 'wasm')
 const mpModel = resolve(root, 'blaze_face_short_range.tflite')
+const mpObjModel = resolve(root, 'efficientdet_lite0.tflite')
 
 for (const modulesDir of modulesDirs) {
   const dst = resolve(modulesDir, 'yz-iris-mp')
@@ -53,6 +54,7 @@ for (const modulesDir of modulesDirs) {
 
   copyFileSync(mpBundle, resolve(dst, 'vision_bundle.mjs'))
   copyFileSync(mpModel, resolve(dst, 'blaze_face_short_range.tflite'))
+  copyFileSync(mpObjModel, resolve(dst, 'efficientdet_lite0.tflite'))
 
   for (const f of readdirSync(mpWasm)) {
     copyFileSync(resolve(mpWasm, f), resolve(dst, 'wasm', f))

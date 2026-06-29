@@ -31,6 +31,41 @@ export interface IrisState {
   sources: SourceInfo[]
 }
 
+export interface YoloeStatus {
+  available: boolean
+  installing: boolean
+  install_error: string | null
+  loaded: string[]
+  model_prompt: string
+  model_prompt_free: string
+}
+
+export interface DetectedObject {
+  label: string
+  conf: number
+  box: [number, number, number, number]
+}
+
+export interface ScanResult {
+  ok: boolean
+  available: boolean
+  text: string
+  objects: DetectedObject[]
+  count: number
+  frame_path?: string
+  error?: string
+}
+
+export interface LookResult {
+  ok: boolean
+  available: boolean
+  found: boolean
+  text: string
+  objects: DetectedObject[]
+  frame_path?: string
+  error?: string
+}
+
 export interface PresenceEvent {
   present: boolean
   position: string

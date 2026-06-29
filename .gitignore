@@ -1,0 +1,12 @@
+# Runtime-downloaded YOLOE weights + MobileCLIP text encoder — NOT bundled. They
+# are AGPL/large and get pulled into the satellite's working dir on first detect
+# (the user-install model, see objects.py / the setup card). Never commit them.
+# NOTE: mobileclip_blt.ts is a TorchScript file (.ts), NOT TypeScript — match it
+# by name, never use a blanket *.ts (that would ignore the UI source).
+*.pt
+/mobileclip*.ts
+
+# uv venv + Python caches (also covered by the repo-root .gitignore; explicit here).
+.venv/
+__pycache__/
+*.egg-info/

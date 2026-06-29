@@ -1,4 +1,11 @@
-import type { CamerasResponse, IrisState, SourceInfo } from '../types'
+import type {
+  CamerasResponse,
+  IrisState,
+  LookResult,
+  ScanResult,
+  SourceInfo,
+  YoloeStatus,
+} from '../types'
 
 export interface IrisApi {
   state(): Promise<IrisState>
@@ -11,6 +18,10 @@ export interface IrisApi {
   activateSource(sourceId: string): Promise<{ ok: boolean }>
   sourceWsUrl(sourceId: string): string
   mpWsUrl(): string
+  yoloeStatus(): Promise<YoloeStatus>
+  yoloeInstall(): Promise<{ ok: boolean; installing?: boolean; available?: boolean; error?: string }>
+  scanRoom(conf?: number): Promise<ScanResult>
+  look(focus: string): Promise<LookResult>
 }
 
 export function createIrisApi({ apiBase }: { apiBase: string }): IrisApi {
@@ -46,6 +57,14 @@ export function createIrisApi({ apiBase }: { apiBase: string }): IrisApi {
     sources: () => getJson<{ sources: SourceInfo[] }>('/sources'),
     activateSource: (sourceId) =>
       postJson<{ ok: boolean }>(`/sources/${sourceId}/activate`),
+    yoloeStatus: () => getJson<YoloeStatus>('/yoloe/status'),
+    yoloeInstall: () =>
+      postJson<{ ok: boolean; installing?: boolean; available?: boolean; error?: string }>(
+        '/yoloe/install',
+      ),
+    scanRoom: (conf) =>
+      postJson<ScanResult>('/tools/scan_room', conf !== undefined ? { conf } : {}),
+    look: (focus) => postJson<LookResult>('/tools/look', { focus }),
     sourceWsUrl: (sourceId) => {
       if (base) {
         const wsBase = base.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://')

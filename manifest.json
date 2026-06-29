@@ -51,13 +51,30 @@
       "section": "iris",
       "speakable": false,
       "kind": "query",
-      "description": "Return a text description of the current scene — who is present, their position and gaze direction. Semantic only (no image). Use get_presence for a faster one-liner, or snapshot to capture actual JPEG frames.",
+      "description": "Describe the current scene: who is present, their position and gaze. WITHOUT focus, returns text only (presence/gaze). WITH focus (e.g. 'my keys', 'a coffee mug'), runs open-vocabulary object detection and reports whether it's found, plus structured boxes and a raw frame path you can Read. For a full inventory of everything visible use scan_room; to just see the scene use snapshot.",
       "parameters": {
         "type": "object",
         "properties": {
           "focus": {
             "type": "string",
-            "description": "Optional — what to pay attention to, e.g. 'the face', 'the desk'."
+            "description": "Optional — a specific object/thing to find in the scene, e.g. 'my keys', 'a laptop', 'the cat'. Triggers object detection."
+          }
+        }
+      }
+    },
+    {
+      "name": "scan_room",
+      "endpoint": "/tools/scan_room",
+      "section": "iris",
+      "speakable": false,
+      "kind": "query",
+      "description": "Open-vocabulary inventory of everything currently visible (objects, furniture, people). Returns a text summary with counts, the structured object list with bounding boxes, and a raw frame path you can Read. Use to understand the room/scene; use look(focus=...) to find one specific thing. Requires the YOLOE engine (user-installed via the Iris setup).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "conf": {
+            "type": "number",
+            "description": "Optional minimum confidence 0-1 (default 0.25). Raise to reduce false positives."
           }
         }
       }

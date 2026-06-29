@@ -1,4 +1,9 @@
-export type ModelId = 'face-detector' | 'face-landmarker' | 'pose-landmarker' | 'hand-landmarker'
+export type ModelId =
+  | 'face-detector'
+  | 'face-landmarker'
+  | 'pose-landmarker'
+  | 'hand-landmarker'
+  | 'object-detector'
 
 export interface ModelDef {
   id: ModelId
@@ -13,6 +18,7 @@ export const MODELS: ModelDef[] = [
   { id: 'face-landmarker', label: 'Face Landmarker', desc: '478 landmarks + iris (gaze)', size: '3.4 MB', color: '#40c4ff' },
   { id: 'pose-landmarker', label: 'Pose Landmarker', desc: '33 body keypoints',           size: '4.7 MB', color: '#ff9800' },
   { id: 'hand-landmarker', label: 'Hand Landmarker', desc: 'Hand + finger landmarks',     size: '8.3 MB', color: '#e040fb' },
+  { id: 'object-detector', label: 'Object Detector', desc: '80 common objects (COCO), live boxes', size: '13.8 MB', color: '#ffd54f' },
 ]
 
 const MP_CDN = 'https://storage.googleapis.com/mediapipe-models'
@@ -22,6 +28,8 @@ export const MODEL_ASSET_PATHS: Record<ModelId, string> = {
   'face-landmarker': `${MP_CDN}/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
   'pose-landmarker': `${MP_CDN}/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
   'hand-landmarker': `${MP_CDN}/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+  // Bundled (offline) — copied into yz-iris-mp/ by the install/copy scripts.
+  'object-detector': '/modules/yz-iris-mp/efficientdet_lite0.tflite',
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,6 +95,13 @@ export async function loadModel(id: ModelId): Promise<AnyDetector> {
         minHandDetectionConfidence: 0.4,
         minHandPresenceConfidence: 0.4,
         minTrackingConfidence: 0.4,
+      })
+    case 'object-detector':
+      return mp.ObjectDetector.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: path, delegate: 'GPU' },
+        runningMode: 'VIDEO',
+        scoreThreshold: 0.4,
+        maxResults: 10,
       })
   }
 }

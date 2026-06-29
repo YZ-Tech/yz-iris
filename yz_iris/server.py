@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
@@ -35,6 +36,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from . import __version__
+from . import objects
 from .camera import CameraLoop, enumerate_cameras
 from .sources import BrowserSource, PythonSource, SourceRegistry
 
@@ -106,6 +108,7 @@ async def _startup() -> None:
 @app.on_event("shutdown")
 async def _shutdown() -> None:
     _loop.close()
+    objects.unload()
 
 
 # ────────────────────────── health ────────────────────────────────
@@ -204,6 +207,36 @@ class LookBody(BaseModel):
     focus: str = ""
 
 
+def _save_frame(frame: bytes, tag: str) -> str:
+    """Persist a JPEG to ~/.jarvyz/iris/ and return its path (for the Loom brain
+    to Read). Mirrors the snapshot tool's save location."""
+    out_dir = Path.home() / ".jarvyz" / "iris"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    p = out_dir / f"{tag}_{ts}.jpg"
+    p.write_bytes(frame)
+    return str(p)
+
+
+def _presence_text(s, source_label: str, age_str: str) -> str:
+    """Phase 1 scene description — preserved verbatim so `look()` (no focus) and
+    the qwen/speakable channel keep their existing wording."""
+    if not s.present:
+        return f"No person detected in frame via {source_label} (last checked {age_str})."
+    gaze_desc = {
+        "screen": "facing the screen",
+        "away": "looking away from the screen",
+        "unknown": "gaze direction unclear",
+    }.get(s.gaze, "gaze unknown")
+    dist_desc = {
+        "near": "close to the camera",
+        "far": "far from the camera",
+        "medium": "at medium distance",
+    }.get(s.distance, "")
+    parts = [f"Someone is present in the {s.position} of frame", dist_desc, gaze_desc]
+    return ", ".join(p for p in parts if p) + f". (State last updated {age_str} via {source_label}.)"
+
+
 @app.post("/tools/look")
 async def tool_look(body: LookBody) -> dict:
     if not _registry.any_running():
@@ -217,38 +250,49 @@ async def tool_look(body: LookBody) -> dict:
 
     active = _registry.active
     s = active.state if active else _registry.best_state()
-
     age = time.monotonic() - s.last_updated
     age_str = f"{age:.1f}s ago" if age < 60 else "more than a minute ago"
-
     source_label = active.label if active else "unknown source"
+    presence_text = _presence_text(s, source_label, age_str)
 
-    if not s.present:
-        text = f"No person detected in frame via {source_label} (last checked {age_str})."
-        if body.focus:
-            text += f" Cannot assess '{body.focus}' — nobody visible."
-        return {"ok": True, "text": text}
+    # No focus -> Phase 1 text-only contract, unchanged. (This is the non-VLM
+    # qwen brain's only way to "see"; do not break it.)
+    if not body.focus:
+        return {"ok": True, "text": presence_text}
 
-    gaze_desc = {
-        "screen": "facing the screen",
-        "away": "looking away from the screen",
-        "unknown": "gaze direction unclear",
-    }.get(s.gaze, "gaze unknown")
-
-    dist_desc = {
-        "near": "close to the camera",
-        "far": "far from the camera",
-        "medium": "at medium distance",
-    }.get(s.distance, "")
-
-    parts = [f"Someone is present in the {s.position} of frame", dist_desc, gaze_desc]
-    text = ", ".join(p for p in parts if p)
-    text += f". (State last updated {age_str} via {source_label}.)"
-
-    if body.focus:
-        text += f" Focus requested: '{body.focus}' — scene understanding requires Phase 2 (YOLOE)."
-
-    return {"ok": True, "text": text}
+    # focus -> Phase 2a open-vocab find via YOLOE. Object presence does NOT
+    # require a person in frame, so no presence gate here.
+    frame = await _get_best_frame()
+    if frame is None:
+        return {
+            "ok": True,
+            "text": presence_text + f" Cannot look for '{body.focus}': no frame available.",
+            "found": False, "objects": [], "frame_path": None,
+            "available": objects.available(),
+        }
+    det = await asyncio.to_thread(objects.detect, frame, body.focus)
+    frame_path = await asyncio.to_thread(_save_frame, frame, "look")
+    if not det.get("available"):
+        return {
+            "ok": True,
+            "text": presence_text + f" Looking for '{body.focus}': object detection "
+            "isn't installed yet (install YOLOE in setup). Raw frame saved for you to view.",
+            "found": False, "objects": [], "frame_path": frame_path, "available": False,
+        }
+    objs = det.get("objects", [])
+    found = len(objs) > 0
+    if found:
+        labels = ", ".join(sorted({o["label"] for o in objs}))
+        find_text = f" Looking for '{body.focus}': found {len(objs)} — {labels}."
+    else:
+        find_text = f" Looking for '{body.focus}': not found in frame."
+    out = {
+        "ok": True, "text": presence_text + find_text,
+        "found": found, "objects": objs, "frame_path": frame_path, "available": True,
+    }
+    if det.get("error"):
+        out["error"] = det["error"]
+    return out
 
 
 @app.post("/tools/get_presence")
@@ -263,6 +307,64 @@ async def tool_get_presence() -> dict:
         "ok": True,
         "text": f"Someone is in the {s.position} of frame, {gaze_map.get(s.gaze, 'gaze unknown')}.",
     }
+
+
+# ────────────────────────── scene understanding (YOLOE — Phase 2a) ─
+
+
+class ScanRoomBody(BaseModel):
+    conf: float = 0.25
+
+
+@app.post("/tools/scan_room")
+async def tool_scan_room(body: ScanRoomBody) -> dict:
+    """Open-vocabulary inventory of the current scene (prompt-free YOLOE).
+    Returns a text summary (qwen/speakable) + structured objects + raw frame
+    path (Loom). Degrades gracefully when YOLOE isn't installed."""
+    if not _registry.any_running():
+        return {
+            "ok": False, "text": "No active camera source — start a camera first.",
+            "objects": [], "frame_path": None, "count": 0, "available": objects.available(),
+        }
+    frame = await _get_best_frame()
+    if frame is None:
+        return {
+            "ok": False, "text": "No frame available — start a camera source first.",
+            "objects": [], "frame_path": None, "count": 0, "available": objects.available(),
+        }
+    det = await asyncio.to_thread(objects.detect, frame, None, body.conf)
+    frame_path = await asyncio.to_thread(_save_frame, frame, "scan")
+    if not det.get("available"):
+        return {
+            "ok": True,
+            "text": "Object detection isn't installed yet — install YOLOE in setup. "
+            "Raw frame saved so you can view the scene directly.",
+            "objects": [], "frame_path": frame_path, "count": 0, "available": False,
+        }
+    objs = det.get("objects", [])
+    counts = Counter(o["label"] for o in objs)
+    summary = ", ".join(f"{n}x {lbl}" if n > 1 else lbl for lbl, n in counts.most_common())
+    out = {
+        "ok": True,
+        "text": f"Scene inventory: {summary}." if summary else "Scene inventory: nothing recognized.",
+        "objects": objs, "frame_path": frame_path, "count": len(objs), "available": True,
+    }
+    if det.get("error"):
+        out["error"] = det["error"]
+    return out
+
+
+@app.get("/yoloe/status")
+async def yoloe_status() -> dict:
+    """Setup-UI helper: is the (AGPL, user-installed) YOLOE engine available?"""
+    return objects.status()
+
+
+@app.post("/yoloe/install")
+async def yoloe_install() -> dict:
+    """Setup-UI action: pip install ultralytics into the satellite venv. Blocking
+    install runs off the event loop. Weights download lazily on first detect."""
+    return await asyncio.to_thread(objects.install)
 
 
 # ────────────────────────── vision frame endpoints ────────────────

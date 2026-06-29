@@ -10,11 +10,17 @@ export interface NormalizedLandmark {
   visibility?: number
 }
 
+export interface ObjectDetection {
+  categories: Array<{ score: number; categoryName?: string }>
+  boundingBox: { originX: number; originY: number; width: number; height: number } | null
+}
+
 export interface FrameResults {
   detections?: Detection[]
   faceLandmarks?: NormalizedLandmark[][]
   poseLandmarks?: NormalizedLandmark[][]
   handLandmarks?: NormalizedLandmark[][]
+  objects?: ObjectDetection[]
   gaze?: string
 }
 
@@ -134,5 +140,25 @@ export function drawOverlay(
   for (const hand of results.handLandmarks ?? []) {
     drawLines(ctx, hand, HAND_CONNECTIONS, W, H)
     drawDots(ctx, hand, W, H, 3)
+  }
+
+  // Object detector boxes + labels (COCO classes), amber. boundingBox is in
+  // pixel coords (same as the face detector), so draw directly.
+  ctx.lineWidth = 2
+  for (const o of results.objects ?? []) {
+    const bb = o.boundingBox
+    if (!bb) continue
+    const cat = o.categories[0]
+    const label = cat?.categoryName ?? 'object'
+    const score = cat?.score ?? 0
+    ctx.strokeStyle = '#ffd54f'
+    ctx.strokeRect(bb.originX, bb.originY, bb.width, bb.height)
+    const text = `${label} ${(score * 100).toFixed(0)}%`
+    ctx.font = 'bold 12px monospace'
+    const tw = ctx.measureText(text).width
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'
+    ctx.fillRect(bb.originX, bb.originY - 15, tw + 8, 15)
+    ctx.fillStyle = '#ffd54f'
+    ctx.fillText(text, bb.originX + 4, bb.originY - 4)
   }
 }

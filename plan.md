@@ -172,11 +172,52 @@ Setting: `iris.respeaker_enabled` (bool, default false until user confirms devic
 - Manifest wired into JarvYZ
 - Privacy shield: Camera row added
 
-### Phase 2 — Scene understanding
-- YOLOE integration with user-install flow
-- `scan_room()` tool
-- `focus` parameter on `look()` routes YOLOE query
-- `scene_change` events
+### Phase 2 — Scene understanding (YOLOE, open-vocabulary)
+
+Split into 2a (on-demand) and 2b (continuous), since on-demand answers the core
+need with the GPU idle when nobody's asking.
+
+**Why YOLOE at all, when the Loom brain is already a VLM?** Loom can describe a
+frame for free, so YOLOE must earn its slot by doing what a glance is bad at:
+exhaustive + precise boxes, reliable counts, finding a *specific* small thing,
+and (2b) real-time change events with no brain round-trip. So YOLOE returns
+STRUCTURED data; Loom combines it with the raw frame. Not a redundant second eye.
+
+**Dual-brain return contract** (both YOLOE tools) — the surface serves two brain
+types at once:
+- `text` — for the text-only ollama/qwen brain (its ONLY way to "see") + speakable.
+- `objects: [{label, conf, box}]` + `frame_path` — for the multimodal Loom brain.
+
+```jsonc
+// scan_room()                      -> {ok, text, objects[], frame_path, count, available}
+// look(focus="my keys")            -> {ok, text, found, objects[], frame_path, available}
+```
+
+`look()` WITHOUT focus is PRESERVED EXACTLY (text scene description, no YOLOE,
+no dependency). `snapshot` and `get_presence` unchanged. Nothing removed —
+`look` is not superseded (it is the non-VLM brain's eyes).
+
+**License (kept clean):** YOLOE (AGPL-3.0) is NEVER bundled. `objects.available()`
+reports importability; `/yoloe/install` pips `ultralytics` into the satellite's
+venv on explicit user action (AGPL shown first); weights download on first
+`YOLOE(...)` call. Satellite stays MIT. Engines/weights: text-prompt =
+`yoloe-11l-seg.pt`, prompt-free (full inventory) = `yoloe-11l-seg-pf.pt`. Lazy
+resident singletons; mind CUDA teardown on shutdown.
+
+**Graceful degradation:** if ultralytics isn't installed, `scan_room`/`look(focus)`
+do NOT hard-fail — they return the raw frame + `available:false` +
+`"object detection not installed (install in setup)"`. Loom still sees; qwen gets
+the note.
+
+#### Phase 2a (THIS build) — on-demand
+- `objects.py`: lazy YOLOE singletons + `available()` / `install()` / `detect(jpeg, prompt)`
+- `/yoloe/status` + `/yoloe/install` endpoints (UI install row is a follow-up)
+- `scan_room()` tool (prompt-free full inventory) + `look(focus=…)` routing (text-prompt)
+- lighting-only `scene_change` (cheap frame-brightness delta — no model)
+
+#### Phase 2b — continuous
+- low-FPS YOLOE in the loop → object-diff `scene_change` events
+- setup-UI install row (replace the manual `/yoloe/install` poke)
 
 ### Phase 3 — ReSpeaker DOA
 - DOA reader thread

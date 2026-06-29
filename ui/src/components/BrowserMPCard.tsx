@@ -131,6 +131,9 @@ export function BrowserMPCard({ wsUrl, onStatusChange, playState }: Props) {
 
         const hl = detectors.get('hand-landmarker')
         if (hl) results.handLandmarks = hl.detectForVideo(video, now).landmarks
+
+        const od = detectors.get('object-detector')
+        if (od) results.objects = od.detectForVideo(video, now).detections
       } catch {
         return
       }

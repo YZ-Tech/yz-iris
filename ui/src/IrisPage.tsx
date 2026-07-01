@@ -7,19 +7,26 @@ import {
   CardContent,
   CardHeader,
   CircularProgress,
+  Collapse,
+  Divider,
   Stack,
-  Switch,
+  Tab,
+  Tabs,
   Typography,
 } from '@mui/material'
 import { ThemeProvider, createTheme, type Theme } from '@mui/material/styles'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import { WSContext, useStandaloneWs } from './lib/ws'
 import { type IrisApi } from './lib/api'
+import { useYoloe } from './lib/useYoloe'
 import { BrowserMPCard } from './components/BrowserMPCard'
-import { BrowserSourceCard } from './components/BrowserSourceCard'
 import { CameraSelector } from './components/CameraSelector'
 import { PresenceWidget } from './components/PresenceWidget'
+import { SceneTools } from './components/SceneTools'
+import { SourceSelector } from './components/SourceSelector'
 import { YoloeSetupCard } from './components/YoloeSetupCard'
 import type { Camera, IrisState } from './types'
 
@@ -30,15 +37,20 @@ export interface IrisPageProps {
   playState?: 'on' | 'paused' | 'off'
 }
 
+type Compute = 'watch' | 'live'
+
 function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'paused' | 'off' }) {
   const [state, setState] = useState<IrisState | null>(null)
   const [cameras, setCameras] = useState<Camera[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [toggling, setToggling] = useState(false)
+  const [compute, setCompute] = useState<Compute>('watch')
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
-  // paused or off = locked: Python camera switch disabled + auto-stopped
-  const locked = !!playState && playState !== 'on'
+  const yoloe = useYoloe(api)
+
+  // paused or off = locked: Python camera auto-stopped (cams can't run when the
+  // nav power is not 'on'). The per-source cards handle their own lock UI.
   const runningRef = useRef(false)
   useEffect(() => { runningRef.current = state?.running ?? false }, [state])
   useEffect(() => {
@@ -70,21 +82,6 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
     return () => clearInterval(id)
   }, [api])
 
-  const handleToggle = async () => {
-    if (!state) return
-    setToggling(true)
-    try {
-      if (state.running) await api.stop()
-      else await api.start()
-      const s = await api.state()
-      setState(s)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setToggling(false)
-    }
-  }
-
   const handleRescanCameras = async () => {
     try {
       const c = await api.rescanCameras()
@@ -113,6 +110,7 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
     <Stack spacing={2} sx={{ maxWidth: 720 }}>
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
+      {/* TOP — always visible: what Iris currently sees, source-agnostic. */}
       <Card variant="outlined">
         <CardHeader
           title={
@@ -121,7 +119,7 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
                 ? <VisibilityIcon color="success" fontSize="small" />
                 : <VisibilityOffIcon color="disabled" fontSize="small" />}
               <Typography variant="subtitle1" component="div" sx={{ fontWeight: 600 }}>
-                {anyRunning ? 'Iris is watching' : 'Iris is idle'}
+                {anyRunning ? 'Eyes are watching' : 'Eyes are idle'}
               </Typography>
             </Stack>
           }
@@ -130,7 +128,7 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
               ? 'via browser camera'
               : pythonRunning
               ? 'via Python camera'
-              : undefined
+              : 'pick a source below to begin'
           }
         />
         {anyRunning && state && (
@@ -144,66 +142,111 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
         )}
       </Card>
 
-      <BrowserMPCard
-        wsUrl={api.mpWsUrl()}
-        playState={playState}
-        onStatusChange={(s) => {
-          if (s === 'detecting' || s === 'ready') {
-            api.state().then(setState).catch(() => {})
-          }
-        }}
-      />
+      {/* COMPUTE layer — where processing happens. Watch (backend, daily) vs Live
+          (browser WASM overlays). Tabs imply exclusive modes; both feed the chips. */}
+      <Box>
+        <Tabs
+          value={compute}
+          onChange={(_, v: Compute) => setCompute(v)}
+          variant="fullWidth"
+        >
+          <Tab value="watch" label="Watch" />
+          <Tab value="live" label="Live" />
+        </Tabs>
+        <Box sx={{ pt: 2 }}>
+          {compute === 'watch' ? (
+            <Stack spacing={2}>
+              <Card variant="outlined">
+                <CardHeader
+                  title="Source"
+                  subheader="Where pixels come from — backend processes any of them"
+                  titleTypographyProps={{ variant: 'subtitle1', fontWeight: 600 }}
+                />
+                <CardContent sx={{ pt: 0 }}>
+                  <SourceSelector
+                    api={api}
+                    state={state}
+                    playState={playState}
+                    onStateChange={setState}
+                  />
+                </CardContent>
+              </Card>
 
-      <BrowserSourceCard
-        wsUrl={api.sourceWsUrl('browser')}
-        playState={playState}
-        onStatusChange={(s) => {
-          if (s === 'streaming' || s === 'ready') {
-            api.state().then(setState).catch(() => {})
-          }
-        }}
-      />
-
-      <Card variant="outlined">
-        <CardHeader
-          title={
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <Typography variant="subtitle1" component="div" sx={{ fontWeight: 600 }}>
-                Python Camera
+              <Card variant="outlined">
+                <CardHeader
+                  title="Scene detection"
+                  subheader="Open-vocabulary: scan the room or find a specific thing"
+                  titleTypographyProps={{ variant: 'subtitle1', fontWeight: 600 }}
+                />
+                <CardContent sx={{ pt: 0 }}>
+                  <SceneTools
+                    api={api}
+                    available={yoloe.available}
+                    onOpenAdvanced={() => setAdvancedOpen(true)}
+                  />
+                </CardContent>
+              </Card>
+            </Stack>
+          ) : (
+            <Stack spacing={1}>
+              <Typography variant="body2" color="text.secondary">
+                Realtime detection runs entirely in your browser (WebAssembly) and draws
+                live overlays — nothing is uploaded. Requires the browser camera.
               </Typography>
-              <Typography variant="caption" color="text.secondary">(optional fallback)</Typography>
-            </Stack>
-          }
-          action={
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', pr: 1 }}>
-              {toggling && <CircularProgress size={16} />}
-              <Switch
-                checked={pythonRunning}
-                disabled={toggling || locked}
-                onChange={handleToggle}
-                color="success"
-                size="small"
+              <BrowserMPCard
+                wsUrl={api.mpWsUrl()}
+                playState={playState}
+                onStatusChange={(s) => {
+                  if (s === 'detecting' || s === 'ready') {
+                    api.state().then(setState).catch(() => {})
+                  }
+                }}
               />
-              <Button size="small" onClick={handleRescanCameras} disabled={locked} sx={{ mt: 0.5 }}>
-                Rescan
-              </Button>
             </Stack>
-          }
-          titleTypographyProps={{ variant: 'subtitle1', fontWeight: 600, component: 'div' }}
-        />
-        <CardContent sx={{ pt: 0 }}>
-          <CameraSelector
-            api={api}
-            pythonCameras={cameras}
-            selectedIndex={state?.selected_index ?? 0}
-            selectedLabel={state?.selected_label ?? ''}
-            onSelected={handleCameraSelected}
-            running={pythonRunning}
-          />
-        </CardContent>
-      </Card>
+          )}
+        </Box>
+      </Box>
 
-      <YoloeSetupCard api={api} />
+      {/* ADVANCED — setup + tuning, tucked away. */}
+      <Box>
+        <Button
+          size="small"
+          color="inherit"
+          onClick={() => setAdvancedOpen((o) => !o)}
+          endIcon={advancedOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          sx={{ color: 'text.secondary' }}
+        >
+          Advanced
+        </Button>
+        <Collapse in={advancedOpen}>
+          <Card variant="outlined" sx={{ mt: 1 }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <YoloeSetupCard yoloe={yoloe} />
+
+                <Divider />
+
+                <Box>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      Python camera
+                    </Typography>
+                    <Button size="small" onClick={handleRescanCameras}>Rescan</Button>
+                  </Stack>
+                  <CameraSelector
+                    api={api}
+                    pythonCameras={cameras}
+                    selectedIndex={state?.selected_index ?? 0}
+                    selectedLabel={state?.selected_label ?? ''}
+                    onSelected={handleCameraSelected}
+                    running={pythonRunning}
+                  />
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Collapse>
+      </Box>
     </Stack>
   )
 }

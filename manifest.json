@@ -1,10 +1,10 @@
 {
   "id": "iris",
-  "name": "Iris",
-  "version": "0.0.1",
+  "name": "Eyes",
+  "version": "0.0.3",
   "enabled": false,
   "nav": {
-    "label": "Iris",
+    "label": "Eyes",
     "icon": "visibility",
     "to": "/iris"
   },
@@ -17,7 +17,7 @@
       "type": "int",
       "default": 0,
       "label": "Camera index",
-      "description": "OpenCV camera index to use (0 = first camera). Set via the Iris page camera picker."
+      "description": "OpenCV camera index to use (0 = first camera). Set via the Eyes page camera picker."
     },
     "camera_label": {
       "type": "string",
@@ -34,7 +34,14 @@
   },
   "service": {
     "url": "http://127.0.0.1:9007",
-    "settingPath": "iris.satellite_url"
+    "settingPath": "iris.satellite_url",
+    "proxy": {
+      "prefix": "/api/iris",
+      "spawnModule": "yz_iris",
+      "autoSpawnSettingPath": "iris.satellite_auto_spawn",
+      "graceS": 30,
+      "timeoutS": 15
+    }
   },
   "contributes": {
     "hooks": {

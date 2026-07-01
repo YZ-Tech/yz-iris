@@ -137,8 +137,8 @@ export function CameraSelector({ api, pythonCameras, selectedIndex, selectedLabe
         </Typography>
         {running ? (
           <Typography variant="caption" color="text.secondary">
-            Preview unavailable while Iris is watching — camera is owned by the Python loop.
-            Stop Iris to re-enable the preview.
+            Preview unavailable while the Eyes are watching — camera is owned by the Python loop.
+            Stop the Eyes to re-enable the preview.
           </Typography>
         ) : !permissionGranted ? (
           <Button

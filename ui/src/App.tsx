@@ -21,7 +21,7 @@ createRoot(document.getElementById('root')!).render(
       <CssBaseline />
       <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
         <div style={{ marginBottom: 20 }}>
-          <strong style={{ fontSize: '1.1rem' }}>Iris</strong>
+          <strong style={{ fontSize: '1.1rem' }}>Eyes</strong>
           <span style={{ fontSize: '0.75rem', opacity: 0.5, marginLeft: 8 }}>
             visual awareness · standalone
           </span>

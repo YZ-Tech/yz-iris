@@ -19,16 +19,48 @@ export function useSubscription<T>(event: string, cb: (data: T) => void): void {
   }, [ws, event])
 }
 
-/** Connect to the iris satellite WebSocket.
- *  Pass an absolute `wsUrl` when the IIFE is embedded in another host
- *  (e.g. "ws://127.0.0.1:9007/events"). Omit for standalone mode — the
- *  URL is derived from window.location. */
-export function useStandaloneWs(wsUrl?: string): WSApi {
+/** Host-injected WS API — JarvYZ's core `/ws` bus (`websocket/context.ts`).
+ *  Structurally a superset of what iris needs (it also has `send`). When the
+ *  IIFE is embedded in JarvYZ the host passes this; iris rides the single core
+ *  bus instead of opening its own socket to the satellite port. */
+export interface HostWSApi {
+  isConnected: boolean
+  subscribe(eventType: string, cb: (msg: unknown) => void): () => void
+}
+
+/** Adapt the host core-`/ws` API to iris's `WSApi`. The core bus delivers the
+ *  full envelope `{ event_type, ts, data: {…} }` (the satellite's `data` block
+ *  survives the generic event bridge intact), but iris components expect the
+ *  UNWRAPPED payload — the same `{ present, position, … }` / `{ target }` they
+ *  get from the satellite's own `/events` after ws.ts peels `data`. So we peel
+ *  `data` here at the boundary, keeping every component untouched. */
+export function adaptHostWs(host: HostWSApi): WSApi {
+  return {
+    isConnected: host.isConnected,
+    subscribe<T>(event: string, cb: (data: T) => void) {
+      return host.subscribe(event, (msg) => {
+        const payload =
+          msg && typeof msg === 'object' && 'data' in msg
+            ? (msg as { data: unknown }).data
+            : msg
+        cb(payload as T)
+      })
+    },
+  }
+}
+
+/** Connect to the iris satellite WebSocket (STANDALONE mode only).
+ *  Omit `wsUrl` for the standalone SPA — the URL is derived from
+ *  window.location (`/events` on the satellite's own origin). Pass
+ *  `enabled: false` when a host `wsApi` is injected, so the hook stays dormant
+ *  (no socket) while still obeying the rules-of-hooks call-order. */
+export function useStandaloneWs(wsUrl?: string, enabled: boolean = true): WSApi {
   const [isConnected, setIsConnected] = useState(false)
   const subsRef = useRef<Map<string, Set<(d: unknown) => void>>>(new Map())
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
+    if (!enabled) return
     let cancelled = false
     let backoff = 0.5
 
@@ -68,7 +100,7 @@ export function useStandaloneWs(wsUrl?: string): WSApi {
       cancelled = true
       try { wsRef.current?.close() } catch { /* ignore */ }
     }
-  }, [wsUrl])
+  }, [wsUrl, enabled])
 
   return {
     isConnected,

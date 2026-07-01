@@ -19,7 +19,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import { WSContext, useStandaloneWs } from './lib/ws'
+import { WSContext, adaptHostWs, useStandaloneWs, type HostWSApi } from './lib/ws'
 import { type IrisApi } from './lib/api'
 import { useYoloe } from './lib/useYoloe'
 import { BrowserMPCard } from './components/BrowserMPCard'
@@ -32,7 +32,10 @@ import type { Camera, IrisState } from './types'
 
 export interface IrisPageProps {
   theme?: Theme
-  wsUrl?: string
+  /** Host-injected core `/ws` bus (JarvYZ embedded mode). When present, iris
+   *  rides the shared bus — no direct socket to the satellite port. Omit for
+   *  the standalone SPA, which opens its own `/events` socket. */
+  wsApi?: HostWSApi
   api: IrisApi
   playState?: 'on' | 'paused' | 'off'
 }
@@ -251,8 +254,14 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
   )
 }
 
-export function IrisPage({ theme: hostTheme, wsUrl, api, playState }: IrisPageProps) {
-  const ws = useStandaloneWs(wsUrl)
+export function IrisPage({ theme: hostTheme, wsApi, api, playState }: IrisPageProps) {
+  // Embedded (host wsApi present): ride the core `/ws` bus via the unwrap
+  // adapter, and keep the standalone socket hook dormant. Standalone (no
+  // wsApi): open our own `/events` socket. The hook is always called
+  // (rules-of-hooks) but only connects when there's no host bus.
+  const standaloneWs = useStandaloneWs(undefined, !wsApi)
+  const hostWs = useMemo(() => (wsApi ? adaptHostWs(wsApi) : null), [wsApi])
+  const ws = hostWs ?? standaloneWs
 
   const localTheme = useMemo(
     () =>

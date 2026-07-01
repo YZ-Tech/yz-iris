@@ -1,7 +1,7 @@
 {
   "name": "yz-iris-ui",
   "private": true,
-  "version": "0.0.3",
+  "version": "0.0.4",
   "type": "module",
   "description": "Iris satellite UI — shipped as react-dynamic-module IIFE for JarvYZ, also buildable as a standalone SPA.",
   "scripts": {

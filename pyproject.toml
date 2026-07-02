@@ -1,6 +1,6 @@
 [project]
 name = "yz-iris"
-version = "0.0.4"
+version = "0.0.5"
 description = "Visual awareness satellite for JarvYZ — webcam presence, gaze, and scene understanding"
 readme = "plan.md"
 requires-python = ">=3.10,<3.13"

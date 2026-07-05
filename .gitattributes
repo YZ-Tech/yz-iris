@@ -1,0 +1,9 @@
+# Tell GitHub Linguist the truth about the committed runtime JS payloads so
+# the repo's language bar reflects the hand-written source (TS + Python),
+# not the bundles:
+#  - static/assets/  = Vite-built standalone SPA (committed inside the Python
+#    package so `pip install yz-iris` serves a UI out of the box)
+#  - yz-iris-mp/     = vendored Google MediaPipe WASM runtime (committed so
+#    vision runs fully local, no CDN)
+yz_iris/static/assets/** linguist-generated
+yz_iris/static/modules/yz-iris-mp/** linguist-vendored

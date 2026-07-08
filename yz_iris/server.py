@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from collections import Counter
 from datetime import datetime, timezone
@@ -34,6 +35,11 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from pydantic import BaseModel
+
+# Per-install data root: JARVYZ_HOME (set by the installer supervisor on core;
+# children inherit it — see backend pipeline/settings.py), else the global
+# ~/.jarvyz dev home. Same idiom as every other satellite's settings module.
+_JARVYZ_HOME = Path(os.environ.get("JARVYZ_HOME") or Path.home() / ".jarvyz")
 
 from . import __version__
 from . import objects
@@ -210,7 +216,7 @@ class LookBody(BaseModel):
 def _save_frame(frame: bytes, tag: str) -> str:
     """Persist a JPEG to ~/.jarvyz/iris/ and return its path (for the Loom brain
     to Read). Mirrors the snapshot tool's save location."""
-    out_dir = Path.home() / ".jarvyz" / "iris"
+    out_dir = _JARVYZ_HOME / "iris"
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     p = out_dir / f"{tag}_{ts}.jpg"
@@ -419,7 +425,7 @@ async def tool_snapshot(body: SnapshotBody) -> dict:
     optional — defaults capture one frame immediately.
     """
     count = max(1, min(5, body.count))
-    out_dir = Path.home() / ".jarvyz" / "iris"
+    out_dir = _JARVYZ_HOME / "iris"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     paths: list[str] = []

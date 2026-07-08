@@ -23,31 +23,60 @@ export const MODELS: ModelDef[] = [
 
 const MP_CDN = 'https://storage.googleapis.com/mediapipe-models'
 
-export const MODEL_ASSET_PATHS: Record<ModelId, string> = {
-  'face-detector':   '/modules/yz-iris-mp/blaze_face_short_range.tflite',
-  'face-landmarker': `${MP_CDN}/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-  'pose-landmarker': `${MP_CDN}/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-  'hand-landmarker': `${MP_CDN}/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-  // Bundled (offline) — copied into yz-iris-mp/ by the install/copy scripts.
-  'object-detector': '/modules/yz-iris-mp/efficientdet_lite0.tflite',
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MPBundle = Record<string, any>
 
 let _bundle: MPBundle | null = null
 let _fileset: unknown = null
 
+// Where the bundled MediaPipe assets (wasm + local .tflite) are served FROM.
+// Standalone SPA: '' — the satellite's own static mount serves
+// /modules/yz-iris-mp/*. JarvYZ-embedded: '/api/iris' — core's straight-strip
+// proxy to that same satellite mount. Core deliberately does NOT bake the
+// 46 MB of assets into its wheel (backend pyproject package-data exclusion),
+// so same-origin core URLs 404 on installed builds — found live in the UE
+// CEF panel 2026-07-08. IrisPage sets this per mount mode.
+let _assetBase = ''
+
+export function setMpAssetBase(base: string): void {
+  const next = base.replace(/\/$/, '')
+  if (next !== _assetBase) {
+    _assetBase = next
+    // The base only flips between mount modes; drop the cached bundle +
+    // fileset so they reload from the right origin.
+    _bundle = null
+    _fileset = null
+  }
+}
+
+const mpAsset = (file: string) => `${_assetBase}/modules/yz-iris-mp/${file}`
+
+function modelAssetPath(id: ModelId): string {
+  switch (id) {
+    // Bundled (offline) — copied into yz-iris-mp/ by the install/copy scripts.
+    case 'face-detector':
+      return mpAsset('blaze_face_short_range.tflite')
+    case 'object-detector':
+      return mpAsset('efficientdet_lite0.tflite')
+    case 'face-landmarker':
+      return `${MP_CDN}/face_landmarker/face_landmarker/float16/1/face_landmarker.task`
+    case 'pose-landmarker':
+      return `${MP_CDN}/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`
+    case 'hand-landmarker':
+      return `${MP_CDN}/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`
+  }
+}
+
 async function getBundle(): Promise<MPBundle> {
   if (_bundle) return _bundle
-  _bundle = await import(/* @vite-ignore */ '/modules/yz-iris-mp/vision_bundle.mjs') as MPBundle
+  _bundle = await import(/* @vite-ignore */ mpAsset('vision_bundle.mjs')) as MPBundle
   return _bundle
 }
 
 async function getFileset(): Promise<unknown> {
   if (_fileset) return _fileset
   const mp = await getBundle()
-  _fileset = await mp.FilesetResolver.forVisionTasks('/modules/yz-iris-mp/wasm')
+  _fileset = await mp.FilesetResolver.forVisionTasks(mpAsset('wasm'))
   return _fileset
 }
 
@@ -60,7 +89,7 @@ export interface AnyDetector {
 export async function loadModel(id: ModelId): Promise<AnyDetector> {
   const mp = await getBundle()
   const fileset = await getFileset()
-  const path = MODEL_ASSET_PATHS[id]
+  const path = modelAssetPath(id)
   switch (id) {
     case 'face-detector':
       return mp.FaceDetector.createFromOptions(fileset, {

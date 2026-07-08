@@ -24,6 +24,8 @@ import { type IrisApi } from './lib/api'
 import { useYoloe } from './lib/useYoloe'
 import { BrowserMPCard } from './components/BrowserMPCard'
 import { CameraSelector } from './components/CameraSelector'
+import { setMpAssetBase } from './components/mpModels'
+import { PowerStrip } from './components/PowerStrip'
 import { PresenceWidget } from './components/PresenceWidget'
 import { SceneTools } from './components/SceneTools'
 import { SourceSelector } from './components/SourceSelector'
@@ -112,6 +114,12 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
   return (
     <Stack spacing={2} sx={{ maxWidth: 720 }}>
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+
+      {/* Power strip — page-top tri-state, parity with every other body
+          part. Embedded mode only (the host injects playState; standalone
+          has no core power endpoint to write to). Inside the Unreal CEF
+          panel this is the ONLY way to power Eyes. */}
+      {playState && <PowerStrip value={playState} />}
 
       {/* TOP — always visible: what Iris currently sees, source-agnostic. */}
       <Card variant="outlined">
@@ -262,6 +270,13 @@ export function IrisPage({ theme: hostTheme, wsApi, api, playState }: IrisPagePr
   const standaloneWs = useStandaloneWs(undefined, !wsApi)
   const hostWs = useMemo(() => (wsApi ? adaptHostWs(wsApi) : null), [wsApi])
   const ws = hostWs ?? standaloneWs
+
+  // MediaPipe assets ride core's /api/iris proxy when embedded (core's wheel
+  // does not ship them); the standalone SPA serves them itself. '/api/iris'
+  // is the manifest's stable proxy prefix. See mpModels.setMpAssetBase.
+  useEffect(() => {
+    setMpAssetBase(wsApi ? '/api/iris' : '')
+  }, [wsApi])
 
   const localTheme = useMemo(
     () =>

@@ -18,7 +18,13 @@ _MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/"
     "face_landmarker/face_landmarker/float16/1/face_landmarker.task"
 )
-_MODEL_PATH = os.path.join(os.path.expanduser("~"), ".jarvyz", "models", "face_landmarker.task")
+# JARVYZ_HOME = per-install data root (installer supervisor sets it; children
+# inherit); unset = the global ~/.jarvyz dev home.
+_MODEL_PATH = os.path.join(
+    os.environ.get("JARVYZ_HOME") or os.path.join(os.path.expanduser("~"), ".jarvyz"),
+    "models",
+    "face_landmarker.task",
+)
 
 
 def _ensure_model() -> str:

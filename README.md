@@ -3,7 +3,7 @@
 # iris
 
 [![JarvYZ](https://img.shields.io/badge/JARVYZ-Satellite-blue.svg?logoColor=white)](../../README.md)
-[![Version](https://img.shields.io/badge/VERSION-0.0.1-blue.svg?logo=git&logoColor=white)](pyproject.toml)
+[![Version](https://img.shields.io/badge/VERSION-0.0.6-blue.svg?logo=git&logoColor=white)](pyproject.toml)
 [![Python](https://img.shields.io/badge/PYTHON-3.10–3.12-blue.svg?logo=python&logoColor=white)](pyproject.toml)
 [![License](https://img.shields.io/badge/LICENSE-MIT-blue.svg?logo=opensourceinitiative&logoColor=white)](pyproject.toml)
 [![Kind](https://img.shields.io/badge/KIND-service-blue.svg?logoColor=white)](#)

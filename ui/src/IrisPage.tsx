@@ -8,15 +8,12 @@ import {
   CardHeader,
   CircularProgress,
   Collapse,
-  Divider,
   Stack,
   Tab,
   Tabs,
   Typography,
 } from '@mui/material'
 import { ThemeProvider, createTheme, type Theme } from '@mui/material/styles'
-import VisibilityIcon from '@mui/icons-material/Visibility'
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import { WSContext, adaptHostWs, useStandaloneWs, type HostWSApi } from './lib/ws'
@@ -26,7 +23,7 @@ import { BrowserMPCard } from './components/BrowserMPCard'
 import { CameraSelector } from './components/CameraSelector'
 import { setMpAssetBase } from './components/mpModels'
 import { PowerStrip } from './components/PowerStrip'
-import { PresenceWidget } from './components/PresenceWidget'
+import { StatusStrip } from './components/StatusStrip'
 import { SceneTools } from './components/SceneTools'
 import { SourceSelector } from './components/SourceSelector'
 import { YoloeSetupCard } from './components/YoloeSetupCard'
@@ -40,11 +37,15 @@ export interface IrisPageProps {
   wsApi?: HostWSApi
   api: IrisApi
   playState?: 'on' | 'paused' | 'off'
+  /** Host page renders its own power header (core SubsystemHeader on /iris,
+   *  2026-07-10) — hide the module's PowerStrip there. The Unreal CEF embed
+   *  omits this, keeping the strip as its only power path. */
+  hidePowerStrip?: boolean
 }
 
 type Compute = 'watch' | 'live'
 
-function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'paused' | 'off' }) {
+function IrisPageInner({ api, playState, hidePowerStrip }: { api: IrisApi; playState?: 'on' | 'paused' | 'off'; hidePowerStrip?: boolean }) {
   const [state, setState] = useState<IrisState | null>(null)
   const [cameras, setCameras] = useState<Camera[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,46 +113,24 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
   const anyRunning = state?.any_running ?? pythonRunning
 
   return (
-    <Stack spacing={2} sx={{ maxWidth: 720 }}>
+    <Stack spacing={2}>
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
 
       {/* Power strip — page-top tri-state, parity with every other body
           part. Embedded mode only (the host injects playState; standalone
           has no core power endpoint to write to). Inside the Unreal CEF
           panel this is the ONLY way to power Eyes. */}
-      {playState && <PowerStrip value={playState} />}
+      {playState && !hidePowerStrip && <PowerStrip value={playState} />}
 
-      {/* TOP — always visible: what Iris currently sees, source-agnostic. */}
-      <Card variant="outlined">
-        <CardHeader
-          title={
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              {anyRunning
-                ? <VisibilityIcon color="success" fontSize="small" />
-                : <VisibilityOffIcon color="disabled" fontSize="small" />}
-              <Typography variant="subtitle1" component="div" sx={{ fontWeight: 600 }}>
-                {anyRunning ? 'Eyes are watching' : 'Eyes are idle'}
-              </Typography>
-            </Stack>
-          }
-          subheader={
-            anyRunning && !pythonRunning
-              ? 'via browser camera'
-              : pythonRunning
-              ? 'via Python camera'
-              : 'pick a source below to begin'
-          }
-        />
-        {anyRunning && state && (
-          <CardContent sx={{ pt: 0 }}>
-            <PresenceWidget
-              initialPresent={state.present}
-              initialPosition={state.position}
-              initialGaze={state.gaze}
-            />
-          </CardContent>
-        )}
-      </Card>
+      {/* TOP — always visible: what Iris currently sees, source-agnostic.
+          A slim strip (sibling of the host's VRAM strip), not a card. */}
+      <StatusStrip
+        anyRunning={anyRunning}
+        pythonRunning={pythonRunning}
+        initialPresent={state?.present ?? false}
+        initialPosition={state?.position ?? ''}
+        initialGaze={state?.gaze ?? 'unknown'}
+      />
 
       {/* COMPUTE layer — where processing happens. Watch (backend, daily) vs Live
           (browser WASM overlays). Tabs imply exclusive modes; both feed the chips. */}
@@ -166,7 +145,14 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
         </Tabs>
         <Box sx={{ pt: 2 }}>
           {compute === 'watch' ? (
-            <Stack spacing={2}>
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 2,
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                alignItems: 'start',
+              }}
+            >
               <Card variant="outlined">
                 <CardHeader
                   title="Source"
@@ -197,7 +183,7 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
                   />
                 </CardContent>
               </Card>
-            </Stack>
+            </Box>
           ) : (
             <Stack spacing={1}>
               <Typography variant="body2" color="text.secondary">
@@ -232,10 +218,15 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
         <Collapse in={advancedOpen}>
           <Card variant="outlined" sx={{ mt: 1 }}>
             <CardContent>
-              <Stack spacing={2}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 3,
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                  alignItems: 'start',
+                }}
+              >
                 <YoloeSetupCard yoloe={yoloe} />
-
-                <Divider />
 
                 <Box>
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
@@ -253,7 +244,7 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
                     running={pythonRunning}
                   />
                 </Box>
-              </Stack>
+              </Box>
             </CardContent>
           </Card>
         </Collapse>
@@ -262,7 +253,7 @@ function IrisPageInner({ api, playState }: { api: IrisApi; playState?: 'on' | 'p
   )
 }
 
-export function IrisPage({ theme: hostTheme, wsApi, api, playState }: IrisPageProps) {
+export function IrisPage({ theme: hostTheme, wsApi, api, playState, hidePowerStrip }: IrisPageProps) {
   // Embedded (host wsApi present): ride the core `/ws` bus via the unwrap
   // adapter, and keep the standalone socket hook dormant. Standalone (no
   // wsApi): open our own `/events` socket. The hook is always called
@@ -293,7 +284,7 @@ export function IrisPage({ theme: hostTheme, wsApi, api, playState }: IrisPagePr
   return (
     <ThemeProvider theme={localTheme}>
       <WSContext.Provider value={ws}>
-        <IrisPageInner api={api} playState={playState} />
+        <IrisPageInner api={api} playState={playState} hidePowerStrip={hidePowerStrip} />
       </WSContext.Provider>
     </ThemeProvider>
   )

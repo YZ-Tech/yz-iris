@@ -1,7 +1,7 @@
 {
   "id": "iris",
   "name": "Eyes",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "enabled": false,
   "nav": {
     "label": "Eyes",
@@ -46,7 +46,10 @@
       "timeoutS": 15
     },
     "events": {
-      "channels": ["presence", "gaze"],
+      "channels": [
+        "presence",
+        "gaze"
+      ],
       "path": "/events"
     },
     "power": {
@@ -77,7 +80,7 @@
         "properties": {
           "focus": {
             "type": "string",
-            "description": "Optional \u2014 a specific object/thing to find in the scene, e.g. 'my keys', 'a laptop', 'the cat'. Triggers object detection."
+            "description": "Optional — a specific object/thing to find in the scene, e.g. 'my keys', 'a laptop', 'the cat'. Triggers object detection."
           }
         }
       }
@@ -105,7 +108,7 @@
       "section": "iris",
       "speakable": true,
       "kind": "info",
-      "description": "Return the current presence state: whether someone is in frame, their position, and gaze direction. Faster than look() \u2014 reads the live CV state without capturing a new frame.",
+      "description": "Return the current presence state: whether someone is in frame, their position, and gaze direction. Faster than look() — reads the live CV state without capturing a new frame.",
       "parameters": {
         "type": "object",
         "properties": {}

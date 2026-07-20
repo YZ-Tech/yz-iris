@@ -1,7 +1,7 @@
 {
   "id": "iris",
   "name": "Eyes",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "enabled": false,
   "nav": {
     "label": "Eyes",

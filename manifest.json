@@ -1,7 +1,7 @@
 {
   "id": "iris",
   "name": "Eyes",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "enabled": false,
   "nav": {
     "label": "Eyes",
@@ -37,10 +37,10 @@
   },
   "service": {
     "url": "http://127.0.0.1:9007",
+    "spawnModule": "yz_iris",
     "settingPath": "iris.satellite_url",
     "proxy": {
       "prefix": "/api/iris",
-      "spawnModule": "yz_iris",
       "autoSpawnSettingPath": "iris.satellite_auto_spawn",
       "graceS": 30,
       "timeoutS": 15

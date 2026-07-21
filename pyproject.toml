@@ -1,6 +1,6 @@
 [project]
 name = "yz-iris"
-version = "0.0.8"
+version = "0.0.9"
 description = "Visual awareness satellite for JarvYZ — webcam presence, gaze, and scene understanding"
 readme = "plan.md"
 requires-python = ">=3.10,<3.13"
@@ -14,6 +14,7 @@ classifiers = [
     "Intended Audience :: End Users/Desktop",
 ]
 dependencies = [
+    "yz-satellite-common>=0.0.1",
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.5.0",

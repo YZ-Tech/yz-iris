@@ -22,6 +22,8 @@ Endpoints:
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 import asyncio
 import json
 import os
@@ -46,7 +48,21 @@ from . import objects
 from .camera import CameraLoop, enumerate_cameras
 from .sources import BrowserSource, PythonSource, SourceRegistry
 
-app = FastAPI(title="iris", version=__version__)
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # was @app.on_event startup/shutdown — deprecated in favor of lifespan
+    global _cameras, _event_loop
+    _event_loop = asyncio.get_running_loop()
+    _cameras = await asyncio.to_thread(enumerate_cameras)
+    _registry.register(_browser_source)
+    _registry.register(_browser_mp_source)
+    _registry.register(_mobile_source)
+    _registry.register(PythonSource(_loop))
+    yield
+    _loop.close()
+    objects.unload()
+
+app = FastAPI(title="iris", version=__version__, lifespan=_lifespan)
 
 # ────────────────────────── event loop reference ──────────────────
 # Stored at startup so background threads can schedule broadcasts via
@@ -98,23 +114,6 @@ _selected_index: int = 0
 _selected_label: str = ""
 
 # ────────────────────────── lifecycle ─────────────────────────────
-
-
-@app.on_event("startup")
-async def _startup() -> None:
-    global _cameras, _event_loop
-    _event_loop = asyncio.get_running_loop()
-    _cameras = await asyncio.to_thread(enumerate_cameras)
-    _registry.register(_browser_source)
-    _registry.register(_browser_mp_source)
-    _registry.register(_mobile_source)
-    _registry.register(PythonSource(_loop))
-
-
-@app.on_event("shutdown")
-async def _shutdown() -> None:
-    _loop.close()
-    objects.unload()
 
 
 # ────────────────────────── health ────────────────────────────────

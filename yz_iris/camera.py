@@ -57,7 +57,12 @@ class CameraLoop:
         self._mp = MediaPipeLayer()
         self._reducer = SemanticReducer()
         self._lock = threading.Lock()
-        self._latest_jpeg: bytes | None = None
+        # Raw latest frame + lazy JPEG memo (encoded on pull, not per
+        # capture tick — see latest_jpeg).
+        self._latest_frame: Any = None
+        self._frame_seq: int = 0
+        self._encoded_jpeg: bytes | None = None
+        self._encoded_seq: int = -1
         self._camera_index: int = 0
 
     @property
@@ -70,8 +75,22 @@ class CameraLoop:
 
     @property
     def latest_jpeg(self) -> bytes | None:
+        """JPEG of the most recent frame, encoded on demand and memoized
+        per frame. The capture loop only stores raw frames; consumers
+        (look()/snapshot/scan_room) are occasional, so encoding here
+        instead of per capture tick removes continuous CPU burn."""
         with self._lock:
-            return self._latest_jpeg
+            frame, seq = self._latest_frame, self._frame_seq
+            if frame is None or seq == self._encoded_seq:
+                return self._encoded_jpeg
+        # Encode outside the lock — the loop replaces (never mutates)
+        # self._latest_frame, so this reference is stable.
+        _, jpeg_buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        data = jpeg_buf.tobytes()
+        with self._lock:
+            self._encoded_jpeg = data
+            self._encoded_seq = seq
+        return data
 
     def set_camera(self, index: int) -> None:
         self._camera_index = index
@@ -120,12 +139,13 @@ class CameraLoop:
                     time.sleep(0.1)
                     continue
 
-                # Store latest JPEG (for look() tool)
-                _, jpeg_buf = cv2.imencode(
-                    ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75]
-                )
+                # Store the latest RAW frame; JPEG encoding is lazy (see
+                # latest_jpeg). Encoding every frame at 10 FPS burned ~3%
+                # of a core continuously while the only consumers
+                # (look()/snapshot/scan_room) pull on demand.
                 with self._lock:
-                    self._latest_jpeg = jpeg_buf.tobytes()
+                    self._latest_frame = frame
+                    self._frame_seq += 1
 
                 # Run MediaPipe
                 result = self._mp.process(frame)
